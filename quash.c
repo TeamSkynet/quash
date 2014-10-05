@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 
 #define MAX_LEN 256
+#define MAX_JOBS 500
 #define DELIMS " \t\r\n"
 
 #define BASH_EXEC  "/bin/bash"
@@ -35,6 +36,15 @@ int main(int argc, char *argv[])
 	int arg_counter;
 	char ln[MAX_LEN];
 
+	struct job
+	{
+		int jobid;
+		int pid;
+		char *command;
+	};
+
+	job jobs[MAX_JOBS];
+
 	while(1) 
 	{
     	printf("quash> ");
@@ -57,37 +67,17 @@ int main(int argc, char *argv[])
 				arg_counter++;		
 			}			
 		}
+
+		/*
 		printf("Command echo: %s\n", current_cmd);
 		for (int i=0; i < arg_counter; i++)
 		{
 			printf("Arg echo: %s\n", args[i]);
 		}
+		*/
+		
+		
 	}
-
-/*			
-    if ((cmd = strtok(ln, DELIMS)))
-    {
-      errno = 0; //Clear any errors
-
-      //Command structure
-      //TODO
-
-      if (strcmp(cmd, "exit") != 0)
-      {
-        printf("You entered %s\n", cmd);
-      }
-      else
-      {
-        break;
-      }
-
-      if (errno)
-      {
-        perror("Command failed\n)");
-      }
-
-    }
-*/    
 
   return 0;
 
