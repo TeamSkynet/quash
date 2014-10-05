@@ -1,3 +1,11 @@
+/****************************************************************
+ * 
+ * Change working directory
+ * Usage: After compiling, run with a valid path as the argument
+ * Example: ./changedir /home/<username>/Documents
+ * 
+ ****************************************************************/
+
 #include <iostream>
 #include <string>
 #include <unistd.h>
