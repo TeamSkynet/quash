@@ -4,4 +4,4 @@ quash.o: quash.c
 	g++ -c quash.c
 
 clean:
-	rm -rf *o quash
+	rm -rf *o *~ quash

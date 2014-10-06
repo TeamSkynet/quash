@@ -28,22 +28,51 @@ void exec_ls()
 
 void exec_cmd(char **args, int pipe_num)
 {
-	const int commands = pipe_num + 1;
+	//const int commands = pipe_num + 1;
 	//int i = 0;
 
 	int fds[2 * pipe_num];
-	int pid;
-	int next_command_pos[MAX_LEN];
+	pid_t pid;
+	//int place_holder;
+	//int next_command_pos[MAX_LEN];
+	char *parse_buffer[MAX_LEN];
+	int pipe_indexes[10];
+	struct command
+	{
+		char *cmd;
+		char *args[MAX_LEN];
+	};
+	
+	command command_stack[10];
 
 	//Pipe creation error handling
 	for (int i = 0; i < pipe_num; i++)
 	{
 		if(pipe(fds + 2 * i) < 0)
 		{
-			fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+			fprintf(stderr, "Process %d encountered an error. ERROR%d", i, errno);
 			exit(EXIT_FAILURE);
 		}
 	} //end for
+
+
+
+	//Read in from args, separate commands from args and pipes
+
+	//Collect index positions of pipes in args
+	int j = 0;
+	for (int i = 0; args[i] != NULL; i++)
+	{
+		if (strcmp(args[i], "|") == 0)
+		{
+			pipe_indexes[j] = i;
+			j++;
+		}		
+	} //end for	
+	printf("pipe_indexes = [%d, %d, %d]\n", pipe_indexes[0], pipe_indexes[1], pipe_indexes[2]);
+
+
+
 
 	
 } //end exec_cmd
@@ -97,13 +126,14 @@ int main(int argc, char *argv[])
 
 
 		//printf("Command echo: %s\n", current_cmd);
+		/*
 		for (int i=0; i < arg_counter; i++)
 		{
 			printf("Arg echo: %s\t, pipe_counter = %d\n", args[i], pipe_counter);
-		}
+		}		*/
 		
-		
-		exec_cmd(args, 0);
+		//Execute command
+		exec_cmd(args, pipe_counter);
 		
 	} //end while
 
