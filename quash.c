@@ -1,15 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <strings.h>
 #include <errno.h>
 #include <sys/wait.h>
 
-#define MAX_LEN 256
-#define MAX_JOBS 500
+#define MAX_LEN 64
+#define MAX_JOBS 32
 #define DELIMS " \t\r\n"
 
 #define BASH_EXEC  "/bin/bash"
@@ -25,7 +23,30 @@
 void exec_ls()
 {
 	execl(LS_EXEC, LS_EXEC, (char *) NULL);
-}
+
+} //exec_ls
+
+void exec_cmd(char **args, int pipe_num)
+{
+	const int commands = pipe_num + 1;
+	//int i = 0;
+
+	int fds[2 * pipe_num];
+	int pid;
+	int next_command_pos[MAX_LEN];
+
+	//Pipe creation error handling
+	for (int i = 0; i < pipe_num; i++)
+	{
+		if(pipe(fds + 2 * i) < 0)
+		{
+			fprintf(stderr, "Process 1 encountered an error. ERROR%d", errno);
+			exit(EXIT_FAILURE);
+		}
+	} //end for
+
+	
+} //end exec_cmd
 
 
 int main(int argc, char *argv[])
@@ -35,11 +56,12 @@ int main(int argc, char *argv[])
 	char *args[MAX_LEN];  //argument array
 	int arg_counter;
 	char ln[MAX_LEN];
+	int pipe_counter;
 
 	struct job
 	{
 		int jobid;
-		int pid;
+		pid_t pid;
 		char *command;
 	};
 
@@ -54,33 +76,37 @@ int main(int argc, char *argv[])
     	}
 		
 		//Read in command and arguments
-		printf("echo: %s\n", ln);
 		cmd = strtok(ln, DELIMS);
-		current_cmd = cmd;
 		arg_counter = 0;
+		pipe_counter = 0;
 		while (cmd != NULL)
 		{	
-			cmd = (strtok(NULL, DELIMS));
 			if (cmd != NULL)
 			{
 				args[arg_counter] = cmd;
-				arg_counter++;		
-			}			
-		}
+				if (strcmp(args[arg_counter], "|") == 0)
+				{
+					pipe_counter++;
+				}	
+				arg_counter++;
+	
+			}	
+			cmd = (strtok(NULL, DELIMS));
+		
+		} //end while
 
-		/*
-		printf("Command echo: %s\n", current_cmd);
+
+		//printf("Command echo: %s\n", current_cmd);
 		for (int i=0; i < arg_counter; i++)
 		{
-			printf("Arg echo: %s\n", args[i]);
+			printf("Arg echo: %s\t, pipe_counter = %d\n", args[i], pipe_counter);
 		}
-		*/
 		
 		
-	}
+		exec_cmd(args, 0);
+		
+	} //end while
 
   return 0;
 
-} 
-
-
+} //end main
