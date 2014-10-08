@@ -20,14 +20,8 @@
 #define LS_EXEC    "/usr/bin/ls"
 
 
-//Executes the ls command
-void exec_ls()
-{
-	execl(LS_EXEC, LS_EXEC, (char *) NULL);
-
-} //exec_ls
-
-void exec_cmd(char *args[], int pipe_num, int arg_num)
+//NOT USED YET
+void create_cmd_stack(char *args[], int pipe_num, int arg_num)
 {
 
 	int fds[2 * pipe_num];
@@ -47,6 +41,7 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 	{
 		char cmd[10];
 		char *args[10];
+		int arg_num;
 	};
 	
 
@@ -54,6 +49,7 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 	struct command command_stack[MAX_CMDS];
 	struct command c;
 	strcpy(c.cmd, "\0");
+	c.arg_num = 0;
 
 	for (int j = 0; j < 10; j++)
 	{
@@ -80,6 +76,13 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 		}		
 	} //end for	
 
+	//Count arguments for commands
+	for (int i = 0; i < pipe_num; i++)
+	{
+		command_stack[i].arg_num = pipe_indexes[i] - 1;
+		printf("command_stack[%d].arg_num = %d\n", i, command_stack[i].arg_num);
+	}
+
 	//Case 1: no pipes
 	if (pipe_num < 1)
 	{
@@ -87,6 +90,7 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 		for (int i = 1; i < arg_num; i++)
 		{
 			command_stack[0].args[i-1] = args[i];
+			//command_stack[0].arg_num++;
 		} //end for
 	} 
 	else
@@ -94,14 +98,19 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 	//Case 2: with pipes
 	//Use pipe_indexes to read in commands and arguments
 		char *arg_loop[10];
+		for (int j = 0; j < 10; j++)
+		{
+			arg_loop[j] = (char *) malloc(5);
+		}
+		
 		for (int i = 0; i < pipe_num; i++)
 		{
-			strcpy(command_stack[i].cmd, args[i]);		
-			for(int k = 0; k < pipe_indexes[i] - 1; k++)
+			strcpy(command_stack[i].cmd, args[pipe_indexes[i] - (command_stack[i].arg_num + 1)]);
+			for(int k = 0; k < command_stack[i].arg_num; k++)
 			{
 				arg_loop[k] = args[k+1];
 			} //end inner for
-		
+					
 			for (int q = 0; q < 10; q++)
 			{
 				command_stack[i].args[q] = arg_loop[q];				
@@ -116,9 +125,8 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 		strcpy(command_stack[pipe_num].cmd, args[pipe_indexes[pipe_num - 1] + 1]);
 		for (int i = (pipe_indexes[pipe_num -1]) + 2; i < arg_num; i++)
 		{	
-			printf("i = %d\n", i);
-			printf("args[%d] = %s\n", i, args[i]);
-			strcpy(command_stack[pipe_num].args[i], args[i]);
+			strcpy(command_stack[pipe_num].args[i-((pipe_indexes[pipe_num -1]) + 2)], args[i]);
+			command_stack[pipe_num].arg_num++;
 		}
 	}  
 
@@ -126,7 +134,7 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 	for (int i = 0; i < 10; i++)
 	{
 		printf("command_stack[%d] = %s ", i, command_stack[i].cmd);
-		for (int k = 0; k < 2; k++)
+		for (int k = 0; k < command_stack[i].arg_num; k++)
 		{
 			printf("%s ",command_stack[i].args[k]);
 		}
@@ -200,16 +208,8 @@ int main(int argc, char *argv[])
 			
 		} //end while
 		
-
-		//printf("Command echo: %s\n", current_cmd);
-		
-		for (int i=0; i < arg_counter; i++)
-		{
-			printf("Arg echo: %s\t, pipe_counter = %d\n", args[i], pipe_counter);
-		}		
-		
 		//Execute command
-		exec_cmd(args, pipe_counter, arg_counter);
+		create_cmd_stack(args, pipe_counter, arg_counter);
 		
 	} //end while
 
