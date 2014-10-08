@@ -8,6 +8,7 @@
 
 #define MAX_LEN 64
 #define MAX_JOBS 32
+#define MAX_CMDS 10
 #define DELIMS " \t\r\n"
 
 #define BASH_EXEC  "/bin/bash"
@@ -33,26 +34,38 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 	pid_t pid;
 	char *parse_buffer[MAX_LEN];
 	int pipe_indexes[10];
+	
+	//Initialize pipe_indexes
+	for (int i = 0; i < 10; i++)
+	{
+		pipe_indexes[i] = 0;
+	}
 
+	//command struct
+	
 	struct command
 	{
 		char cmd[10];
 		char *args[10];
 	};
 	
-	struct command command_stack[5];
 
+	//Create and initialize command_stack
+	struct command command_stack[MAX_CMDS];
+	struct command c;
+	strcpy(c.cmd, "none");
 
-	//Pipe creation error handling
-	for (int i = 0; i < pipe_num; i++)
+	for (int j = 0; j < 10; j++)
 	{
-		if(pipe(fds + 2 * i) < 0)
-		{
-			fprintf(stderr, "Process %d encountered an error. ERROR%d", i, errno);
-			exit(EXIT_FAILURE);
-		}
-	} //end for
-
+		c.args[j] = (char*) malloc(5);
+		strcpy(c.args[j], "none");		
+	}
+	
+	for (int i = 0; i < MAX_CMDS + 1; i++)
+	{
+		command_stack[i] = c;
+	}
+	
 	//Read in from args, separate commands from args and pipes
 	
 	//Collect index positions of pipes in args
@@ -66,63 +79,69 @@ void exec_cmd(char *args[], int pipe_num, int arg_num)
 			j++;
 		}		
 	} //end for	
-	//printf("pipe_indexes = [%d, %d, %d]\n", pipe_indexes[0], pipe_indexes[1], pipe_indexes[2]);
-	
+
 	//Case 1: no pipes
 	if (pipe_num < 1)
 	{
-		struct command command_stack[0];  //REMOVE
 		strcpy(command_stack[0].cmd, args[0]);	
 		for (int i = 1; i < arg_num; i++)
 		{
 			command_stack[0].args[i-1] = args[i];
 		} //end for
-	}
-
+	} 
+	else
+	{
 	//Case 2: with pipes
 	//Use pipe_indexes to read in commands and arguments
-	char *arg_loop[10];
-	for (int i = 0; i < pipe_num; i++)
-	{
-		struct command command_stack[i];  //REMOVE
-		printf("args[i] = %s\n", args[i]);
-		strcpy(command_stack[i].cmd, args[i]);		
-		for(int k = 0; k < pipe_indexes[i] - 1; k++)
+		char *arg_loop[10];
+		for (int i = 0; i < pipe_num; i++)
 		{
-			arg_loop[k] = args[k+1];			
-		} //end inner for
+			strcpy(command_stack[i].cmd, args[i]);		
+			for(int k = 0; k < pipe_indexes[i] - 1; k++)
+			{
+				arg_loop[k] = args[k+1];
+			} //end inner for
 		
-		for (int q = 0; q < 10; q++)
-		{
-			command_stack[i].args[q] = arg_loop[q];
-		} //end inner for
-			
-	} //end outer for
+			for (int q = 0; q < 10; q++)
+			{
+				command_stack[i].args[q] = arg_loop[q];				
+			} //end inner for		
+		} //end outer for
+	} //end if
 
-	//TESTING
-	/*
-	for (int i = 0; i < 10; i++)
-	{
-		printf("command_stack[%d]= %s", command_stack[i].cmd);
-		for (int k = 0; k < 10; k++)
-		{
-			printf("%s ", command_stack[i].args[k]);
-		}
-		printf("\n");
-	} */
+	//FIX - Read in last command if pipe used
 	
-	//Read in last command if pipe used
-	/*
 	if (pipe_num > 0)
 	{
-		command_stack.cmd = args[pipe_indexes[pipe_num -1];
-		while (args != NULL)
+		strcpy(command_stack[pipe_num].cmd, args[pipe_indexes[pipe_num -1]]);
+		for (int i = 0; i < (arg_num - pipe_indexes[pipe_num -1]); i++)
 		{
-			command_stack.args
+			command_stack[pipe_num].args[i] = args[i];
 		}
-	}
-	*/
+	}  
 
+	//TESTING - FIX Seg Fault when k > 1
+	for (int i = 0; i < 10; i++)
+	{
+		printf("command_stack[%d] = %s ", i, command_stack[i].cmd);
+		for (int k = 0; k < 1; k++)
+		{
+			printf("%s ",command_stack[i].args[k]);
+		}
+		printf("\n");
+	} // end for
+
+	/*
+	//Pipe creation error handling
+	for (int i = 0; i < pipe_num; i++)
+	{
+		if(pipe(fds + 2 * i) < 0)
+		{
+			fprintf(stderr, "Process %d encountered an error. ERROR%d\n", i, errno);
+			exit(EXIT_FAILURE);
+		}
+	} //end for
+	*/
 	
 } //end exec_cmd
 
@@ -143,6 +162,12 @@ int main(int argc, char *argv[])
 		char *command;
 	};
 
+	struct command
+	{
+		char cmd[10];
+		char *args[10];
+	};
+
 	job jobs[MAX_JOBS];
 
 	while(1) 
@@ -155,6 +180,7 @@ int main(int argc, char *argv[])
 		
 		//Read in command and arguments
 		cmd = strtok(ln, DELIMS);
+		current_cmd = cmd;
 		arg_counter = 0;
 		pipe_counter = 0;
 		while (cmd != NULL)
@@ -167,19 +193,19 @@ int main(int argc, char *argv[])
 					pipe_counter++;
 				}	
 				arg_counter++;
-	
+				
 			}	
 			cmd = (strtok(NULL, DELIMS));
-		
+			
 		} //end while
-
+		
 
 		//printf("Command echo: %s\n", current_cmd);
-		/*
+		
 		for (int i=0; i < arg_counter; i++)
 		{
 			printf("Arg echo: %s\t, pipe_counter = %d\n", args[i], pipe_counter);
-		}		*/
+		}		
 		
 		//Execute command
 		exec_cmd(args, pipe_counter, arg_counter);
