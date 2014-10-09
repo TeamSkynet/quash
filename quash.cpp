@@ -177,7 +177,6 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 	char *home;
 	
   	home = getenv("HOME");
-	printf("home = %s\n", home);
 	path = getenv("PATH");
 	pid_t cpid;  //child process ID for background jobs
 	int back_flag = 0;
@@ -194,9 +193,7 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 	if ((strcmp(cmd, "ls") == 0) || (strcmp(cmd, "ls&") == 0))
 	{		
 		strcpy(path, LS_EXEC);
-		//printf("ls path = %s\n", path);
-	}
-	/*
+	}	
 	else if ((strcmp(cmd, "cd") == 0) || (strcmp(cmd, "cd") == 0))
 	{
 		if (args[0] != NULL)
@@ -209,16 +206,10 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 		}
 		chdir(path);
 	} //end if..else if..else
-	*/
-
-	//TEST
-	for (int i = 0; i < arg_num; i++)
-	{
-		printf("(in exec_cmd) args[%d] = %s\n", i, args[i]);
-	}
+	
 
 	char **exec_args = new char *[MAX_CMDS];
-	//contruct argv[] argument for excev(...) function
+	//contruct argv[] argument for excev(...) function (needs path in first pos)
 	exec_args[0] = path;
 	for (int j = 1; j < arg_num + 1; j++)
 	{
@@ -226,34 +217,42 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 	}
 
 	cpid = fork();
-	printf("cpid = %d\n", cpid);
 	//Execute command
 	if (back_flag == 0)
 	{
 		if (cpid == 0)
 		{
 			execv(path, exec_args);
-   			exit(0);
+   			//exit(0);
 		} //end if
+		else if (cpid > 0)
+		{
+			wait(NULL);			
+		} //end if..else
 		else
 		{
 			printf("Process Failure: ERROR %d\n", errno);
-		} //end if..else
+		}
 		
-		cout << "RUN JOB IN FOREGROUND\n";
+
 	}  
 	else  //background execution
 	{
-		cout << "RUN JOB IN BACKGROUND\n";
+
 		if (cpid == 0)
 		{
 			execv(path, exec_args);
-   			exit(0);
+   			//exit(0);
 		} //end if
+		else if (cpid > 0)
+		{	
+			cout << cpid << " running in background\n";	
+			wait(NULL);				
+		} //end if..else
 		else
 		{
-			//printf("Process Failure: ERROR %d\n", errno);
-		} //end if..else		
+			printf("Process Failure: ERROR %d\n", errno);
+		}
 	} //end if..else
 
 	return 0;
@@ -349,6 +348,7 @@ int main(int argc, char *argv[])
 
 		//Execute command
 		exec_cmd(current_cmd, args, arg_counter);
+
 		//execute(cmd_vector);
 	} //end while
 
