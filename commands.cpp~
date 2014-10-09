@@ -185,7 +185,7 @@ void execute(  )
 			cout << "RUN JOB IN BACKGROUND\n";
 		} else {
 			// TODO run current job in foregroune
-			cout << "RUN JOB IN foreground\n";
+			cout << "RUN JOB IN foregroune\n";
 		}
 		
 		for (int i = 0; i < command.size() + 1; ++i) {
