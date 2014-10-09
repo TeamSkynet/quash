@@ -20,143 +20,69 @@
 #define LS_EXEC    "/usr/bin/ls"
 
 
-//NOT USED YET
-void create_cmd_stack(char *args[], int pipe_num, int arg_num)
+int exec_cmd(char *cmd, char *args[], int arg_num)
 {
-
-	int fds[2 * pipe_num];
-	pid_t pid;
-	char *parse_buffer[MAX_LEN];
-	int pipe_indexes[10];
+	char *path = (char *)malloc(MAX_LEN * sizeof(char));
+	//char *home;
 	
-	//Initialize pipe_indexes
-	for (int i = 0; i < 10; i++)
-	{
-		pipe_indexes[i] = 0;
+  	//home = getenv("HOME");
+	//path = home;
+	pid_t cpid;
+
+	if (strcmp(cmd, "ls") == 0)
+	{		
+		strcpy(path, LS_EXEC);
 	}
-
-	//command struct
-	
-	struct command
+	/*
+	else if (strcmp(cmd, "cd") == 0)
 	{
-		char cmd[10];
-		char *args[10];
-		int arg_num;
-	};
-	
-
-	//Create and initialize command_stack
-	struct command command_stack[MAX_CMDS];
-	struct command c;
-	strcpy(c.cmd, "\0");
-	c.arg_num = 0;
-
-	for (int j = 0; j < 10; j++)
-	{
-		c.args[j] = (char*) malloc(5);
-		strcpy(c.args[j], "\0");		
-	}
-	
-	for (int i = 0; i < MAX_CMDS + 1; i++)
-	{
-		command_stack[i] = c;
-	}
-	
-	//Read in from args, separate commands from args and pipes
-	
-	//Collect index positions of pipes in args
-	int j = 0;
-	for (int i = 0; i < arg_num; i++)
-	{
-		//printf("args[%d]= %s\n", i, args[i]);
-		if (strcmp(args[i], "|") == 0)
+		if (args[0] != NULL)
+		{		
+			strcpy(path, args[0]);
+		}
+		else
 		{
-			pipe_indexes[j] = i;
-			j++;
-		}		
-	} //end for	
+			strcpy(path, home);
+		}
+		chdir(path);
+	} //end if..else if..else
+	*/
 
-	//Count arguments for commands
-	for (int i = 0; i < pipe_num; i++)
-	{
-		command_stack[i].arg_num = pipe_indexes[i] - 1;
-		printf("command_stack[%d].arg_num = %d\n", i, command_stack[i].arg_num);
-	}
+	cpid = fork();
 
-	//Case 1: no pipes
-	if (pipe_num < 1)
+	if (cpid >= 0)
 	{
-		strcpy(command_stack[0].cmd, args[0]);	
-		for (int i = 1; i < arg_num; i++)
+		if (cpid == 0)
 		{
-			command_stack[0].args[i-1] = args[i];
-			//command_stack[0].arg_num++;
-		} //end for
+
+			execv(path, args);
+   			exit(0);
+		} //end if
 	} 
 	else
 	{
-	//Case 2: with pipes
-	//Use pipe_indexes to read in commands and arguments
-		char *arg_loop[10];
-		for (int j = 0; j < 10; j++)
-		{
-			arg_loop[j] = (char *) malloc(5);
-		}
-		
-		for (int i = 0; i < pipe_num; i++)
-		{
-			strcpy(command_stack[i].cmd, args[pipe_indexes[i] - (command_stack[i].arg_num + 1)]);
-			for(int k = 0; k < command_stack[i].arg_num; k++)
-			{
-				arg_loop[k] = args[k+1];
-			} //end inner for
-					
-			for (int q = 0; q < 10; q++)
-			{
-				command_stack[i].args[q] = arg_loop[q];				
-			} //end inner for		
-		} //end outer for
-	} //end if
+		printf("Process Failure: ERROR %d\n", errno);
+		return 1;
+	}
 
-	//FIX - Read in last command if pipe used
-	
-	if (pipe_num > 0)
-	{
-		strcpy(command_stack[pipe_num].cmd, args[pipe_indexes[pipe_num - 1] + 1]);
-		for (int i = (pipe_indexes[pipe_num -1]) + 2; i < arg_num; i++)
-		{	
-			strcpy(command_stack[pipe_num].args[i-((pipe_indexes[pipe_num -1]) + 2)], args[i]);
-			command_stack[pipe_num].arg_num++;
-		}
-	}  
+	return 0;
+}
 
-	//TESTING - FIX Seg Fault when k > 1
-	for (int i = 0; i < 10; i++)
-	{
-		printf("command_stack[%d] = %s ", i, command_stack[i].cmd);
-		for (int k = 0; k < command_stack[i].arg_num; k++)
-		{
-			printf("%s ",command_stack[i].args[k]);
-		}
-		printf("\n");
-	} // end for
-	/*
-	//Pipe creation error handling
-	for (int i = 0; i < pipe_num; i++)
-	{
-		if(pipe(fds + 2 * i) < 0)
-		{
-			fprintf(stderr, "Process %d encountered an error. ERROR%d\n", i, errno);
-			exit(EXIT_FAILURE);
-		}
-	} //end for
-	*/
-	
-} //end exec_cmd
 
+//*******Main Program*******
 
 int main(int argc, char *argv[])
 {
+	//Environment variables
+	char *home, *host, *path, *cwd;
+
+ 	home = getenv("HOME");
+  	host = getenv("HOSTNAME");
+	path = getenv("PATH");
+	//cwd = getenv("PWD");
+
+
+	//Other variables
 	char *cmd;  //command and argument buffer
 	char *current_cmd;  //current command for execution
 	char *args[MAX_LEN];  //argument array
@@ -171,17 +97,18 @@ int main(int argc, char *argv[])
 		char *command;
 	};
 
-	struct command
-	{
-		char cmd[10];
-		char *args[10];
-	};
-
 	job jobs[MAX_JOBS];
+
+	//Initialize arguments array
+	for (int i = 0; i < MAX_LEN; i++)
+	{
+		args[i] = (char *) malloc(5);
+		//args[i] = (char *) NULL;
+	}
 
 	while(1) 
 	{
-    	printf("quash> ");
+    	printf("%s quash> ", home);
     	if (!fgets(ln, MAX_LEN, stdin))
     	{
       		break;
@@ -194,6 +121,8 @@ int main(int argc, char *argv[])
 		pipe_counter = 0;
 		while (cmd != NULL)
 		{	
+			cmd = (strtok(NULL, DELIMS));
+
 			if (cmd != NULL)
 			{
 				args[arg_counter] = cmd;
@@ -201,17 +130,33 @@ int main(int argc, char *argv[])
 				{
 					pipe_counter++;
 				}	
-				arg_counter++;
-				
-			}	
-			cmd = (strtok(NULL, DELIMS));
-			
+				arg_counter++;				
+			}
+						
 		} //end while
+
+		//Terminate args with NULL char
+		args[arg_counter + 1] = NULL;
 		
+		//TESTING
+		printf("%s ", current_cmd);
+		for (int i = 0; i < arg_counter; i++)
+		{
+			printf("%s ", args[i]);
+		}
+		printf("\n");
+
+		if ((strcmp(current_cmd, "exit") == 0) || (strcmp(current_cmd, "quit") == 0))
+		{
+			break;
+		}
+
 		//Execute command
-		create_cmd_stack(args, pipe_counter, arg_counter);
+		exec_cmd(current_cmd, args, arg_counter);
 		
 	} //end while
+
+	//free(*args);
 
   return 0;
 
