@@ -1,0 +1,313 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <strings.h>
+#include <errno.h>
+#include <sys/wait.h>
+
+#include <iostream>
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+#include <cstdlib>
+#include <string>
+#include <sstream>
+#include <vector>
+#include <cstring>
+#include <dirent.h>
+#include <sys/param.h>
+
+#define MAX_LEN 64
+#define MAX_JOBS 32
+#define MAX_CMDS 10
+#define DELIMS " \t\r\n"
+
+#define BASH_EXEC  "/bin/bash"
+#define FIND_EXEC  "/bin/find"
+#define XARGS_EXEC "/usr/bin/xargs"
+#define GREP_EXEC  "/bin/grep"
+#define SORT_EXEC  "/bin/sort"
+#define HEAD_EXEC  "/usr/bin/head"
+#define LS_EXEC    "/usr/bin/ls"
+
+using namespace std;
+
+void exec_set(string envvar, string val)
+{
+	if (setenv(envvar.c_str(), val.c_str(), 1) != 0) {
+		cout << "setenv error, exit code not zero";
+	}
+}
+
+void execute(vector<string> command)
+{
+	
+	if(command.at(0) == "cd") {
+		string path = "";
+		
+		// Create new path
+		for (int j = 1; j < command.size(); ++j) {
+			path += command.at(j) + " ";
+		}
+
+		chdir(path.c_str());
+		
+		char *test_path=NULL;
+		size_t size;
+		test_path=getcwd(test_path,size);
+		cout << "\nCurrent Path: " << test_path << endl << endl;
+		
+		return;
+	}
+	if(command.at(0) == "set") {
+		string path = "";
+		for (int j = 1; j < command.size(); ++j) {
+			path += command.at(j);
+			
+			if (j < command.size()-1)
+				path += " ";
+		}
+		
+		exec_set(path.substr(0, path.find("=")), path.substr(path.find("=")+1));
+		
+		return;
+	}
+
+	
+	string cmd_path(command.at(0));
+	
+	
+	// If command is not specified as absolute path, search directories in 
+	// PATH environment variable
+	if(cmd_path.at(0) != '/') {
+	
+		// Parse PATH into array, each index a directory
+		vector<string> paths;
+		
+		// path_var_str = "";
+		
+		const char* raw_paths = getenv("PATH");
+		
+		//if (path_var != NULL) {
+		//	string path_var_str = path_var;
+		//}
+		
+		string str_paths = raw_paths?raw_paths:"";
+		
+		
+		cout << "PATH_VAR: " << str_paths << endl;
+		
+		// Parse by colon
+		char delim = ':';
+		stringstream path_stream(str_paths);
+		string path;
+		
+		while ( getline(path_stream, path, delim)) {
+			paths.push_back(path);
+		}
+		
+		// Read path contents to find command
+		DIR *dir;
+		struct dirent *contents;
+		
+		for(int j = 0; j < paths.size(); ++j) {
+			dir = opendir(paths.at(j).c_str());
+			
+			if (dir != NULL) {
+				while (contents = readdir(dir)) {
+					if ( (string)contents->d_name == cmd_path ) {
+						cmd_path = paths.at(j) + '/' + cmd_path;
+					}
+				}
+			}
+			
+		}
+	}
+	
+	// If the cmd_path still doesn't have an absolute path, something
+	// is wrong
+	if (cmd_path.at(0) != '/') {
+		cout << "Command not found in path: ";
+	}
+	
+	cout << "CMD_PATH: " << cmd_path << endl;
+	
+	// Convert vector to char array
+	char ** cmd_array = new char*[command.size()];
+	
+	for( int j = 0; j < command.size() + 1; ++j) {
+		if (j < command.size()) {
+			cmd_array[j] = new char[command[j].size() + 1];
+			strcpy(cmd_array[j], command[j].c_str());
+			cout << cmd_array[j] << endl;
+		}
+		// The last item is null char
+		else {
+			cmd_array[j] = (char *) 0;
+		}
+	}
+	
+	if (command.at(command.size()-1).rfind("&") != string::npos) {
+		// TODO run current job in background
+		cout << "RUN JOB IN BACKGROUND\n";
+	} else {
+		// TODO run current job in foregroune
+		cout << "RUN JOB IN FORGROUND\n";
+	}
+	
+	for (int j = 0; j < command.size() + 1; ++j) {
+		delete [] cmd_array[j];
+	}
+	delete [] cmd_array;
+	
+	return;
+}
+
+int exec_cmd(char *cmd, char *args[], int arg_num)
+{
+	char *path = (char *)malloc(MAX_LEN * sizeof(char));
+	//char *home;
+	
+  	//home = getenv("HOME");
+	//path = home;
+	pid_t cpid;
+
+	if (strcmp(cmd, "ls") == 0)
+	{		
+		strcpy(path, LS_EXEC);
+	}
+	/*
+	else if (strcmp(cmd, "cd") == 0)
+	{
+		if (args[0] != NULL)
+		{		
+			strcpy(path, args[0]);
+		}
+		else
+		{
+			strcpy(path, home);
+		}
+		chdir(path);
+	} //end if..else if..else
+	*/
+
+	cpid = fork();
+
+	if (cpid >= 0)
+	{
+		if (cpid == 0)
+		{
+
+			execv(path, args);
+   			exit(0);
+		} //end if
+	} 
+	else
+	{
+		printf("Process Failure: ERROR %d\n", errno);
+		return 1;
+	}
+
+	return 0;
+}
+
+
+//*******Main Program*******
+
+int main(int argc, char *argv[])
+{
+	//Environment variables
+	char *home, *host, *path, *cwd;
+
+ 	home = getenv("HOME");
+  	host = getenv("HOSTNAME");
+	path = getenv("PATH");
+	//cwd = getenv("PWD");
+
+
+	//Other variables
+	char *cmd;  //command and argument buffer
+	char *current_cmd;  //current command for execution
+	char *args[MAX_LEN];  //argument array
+	int arg_counter;
+	char ln[MAX_LEN];
+	int pipe_counter;
+
+	struct job
+	{
+		int jobid;
+		pid_t pid;
+		char *command;
+	};
+
+	job jobs[MAX_JOBS];
+
+	//Initialize arguments array
+	for (int i = 0; i < MAX_LEN; i++)
+	{
+		args[i] = (char *) malloc(5);
+		//args[i] = (char *) NULL;
+	}
+
+	while(1) 
+	{
+    	printf("%s quash> ", home);
+    	if (!fgets(ln, MAX_LEN, stdin))
+    	{
+      		break;
+    	}
+		
+		//Read in command and arguments
+		cmd = strtok(ln, DELIMS);
+		current_cmd = cmd;
+		arg_counter = 0;
+		pipe_counter = 0;
+		while (cmd != NULL)
+		{	
+			cmd = (strtok(NULL, DELIMS));
+
+			if (cmd != NULL)
+			{
+				args[arg_counter] = cmd;
+				if (strcmp(args[arg_counter], "|") == 0)
+				{
+					pipe_counter++;
+				}	
+				arg_counter++;				
+			}
+						
+		} //end while
+
+		//Terminate args with NULL char
+		args[arg_counter + 1] = NULL;
+		
+		vector<string> cmd_vector;
+		
+		//TESTING
+		printf("%s ", current_cmd);
+		cmd_vector.push_back(current_cmd);
+		for (int i = 0; i < arg_counter; i++)
+		{
+			printf("%s ", args[i]);
+			cmd_vector.push_back(args[i]);
+		}
+		printf("\n");
+
+		if ((strcmp(current_cmd, "exit") == 0) || (strcmp(current_cmd, "quit") == 0))
+		{
+			break;
+		}
+
+		//Execute command
+		//exec_cmd(current_cmd, args, arg_counter);
+		execute(cmd_vector);
+	} //end while
+
+	//free(*args);
+
+  return 0;
+
+} //end main
