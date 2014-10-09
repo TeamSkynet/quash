@@ -1,17 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <string.h>
-#include <strings.h>
 #include <errno.h>
 #include <sys/wait.h>
-
 #include <iostream>
-#include <stdlib.h>
-#include <errno.h>
-#include <unistd.h>
 #include <sys/types.h>
-
 #include <cstdlib>
 #include <string>
 #include <sstream>
@@ -44,7 +37,8 @@ void exec_set(string envvar, string val)
 
 void execute(vector<string> command)
 {
-	
+	pid_t child_pid;	
+
 	if(command.at(0) == "cd") {
 		string path = "";
 		
@@ -130,19 +124,21 @@ void execute(vector<string> command)
 	// If the cmd_path still doesn't have an absolute path, something
 	// is wrong
 	if (cmd_path.at(0) != '/') {
-		cout << "Command not found in path: ";
+		cout << "ERROR: Command not found in path: ";
 	}
 	
 	cout << "CMD_PATH: " << cmd_path << endl;
 	
 	// Convert vector to char array
 	char ** cmd_array = new char*[command.size()];
+	int arg_count = 0;
 	
 	for( int j = 0; j < command.size() + 1; ++j) {
 		if (j < command.size()) {
 			cmd_array[j] = new char[command[j].size() + 1];
 			strcpy(cmd_array[j], command[j].c_str());
 			cout << cmd_array[j] << endl;
+			arg_count ++;
 		}
 		// The last item is null char
 		else {
@@ -150,11 +146,20 @@ void execute(vector<string> command)
 		}
 	}
 	
+	
+
+	
 	if (command.at(command.size()-1).rfind("&") != string::npos) {
 		// TODO run current job in background
+		child_pid = fork();
+		if (child_pid == 0)
+		{
+			//execv(cmd_path, args);
+		}
 		cout << "RUN JOB IN BACKGROUND\n";
 	} else {
-		// TODO run current job in foregroune
+		// TODO run current job in foreground
+		//execv(cmd_path, args);
 		cout << "RUN JOB IN FORGROUND\n";
 	}
 	
@@ -169,18 +174,30 @@ void execute(vector<string> command)
 int exec_cmd(char *cmd, char *args[], int arg_num)
 {
 	char *path = (char *)malloc(MAX_LEN * sizeof(char));
-	//char *home;
+	char *home;
 	
-  	//home = getenv("HOME");
-	//path = home;
-	pid_t cpid;
+  	home = getenv("HOME");
+	printf("home = %s\n", home);
+	path = getenv("PATH");
+	pid_t cpid;  //child process ID for background jobs
+	int back_flag = 0;
 
-	if (strcmp(cmd, "ls") == 0)
+	//Check for & in command indicating background job
+	for (int i = 0; i < sizeof(cmd); i++)
+	{
+		if (cmd[i] == '&')
+		{
+			back_flag = 1;
+		}
+	}
+
+	if ((strcmp(cmd, "ls") == 0) || (strcmp(cmd, "ls&") == 0))
 	{		
 		strcpy(path, LS_EXEC);
+		//printf("ls path = %s\n", path);
 	}
 	/*
-	else if (strcmp(cmd, "cd") == 0)
+	else if ((strcmp(cmd, "cd") == 0) || (strcmp(cmd, "cd") == 0))
 	{
 		if (args[0] != NULL)
 		{		
@@ -194,22 +211,50 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 	} //end if..else if..else
 	*/
 
-	cpid = fork();
+	//TEST
+	for (int i = 0; i < arg_num; i++)
+	{
+		printf("(in exec_cmd) args[%d] = %s\n", i, args[i]);
+	}
 
-	if (cpid >= 0)
+	char **exec_args = new char *[MAX_CMDS];
+	//contruct argv[] argument for excev(...) function
+	exec_args[0] = path;
+	for (int j = 1; j < arg_num + 1; j++)
+	{
+		exec_args[j] = args[j-1];
+	}
+
+	cpid = fork();
+	printf("cpid = %d\n", cpid);
+	//Execute command
+	if (back_flag == 0)
 	{
 		if (cpid == 0)
 		{
-
-			execv(path, args);
+			execv(path, exec_args);
    			exit(0);
 		} //end if
-	} 
-	else
+		else
+		{
+			printf("Process Failure: ERROR %d\n", errno);
+		} //end if..else
+		
+		cout << "RUN JOB IN FOREGROUND\n";
+	}  
+	else  //background execution
 	{
-		printf("Process Failure: ERROR %d\n", errno);
-		return 1;
-	}
+		cout << "RUN JOB IN BACKGROUND\n";
+		if (cpid == 0)
+		{
+			execv(path, exec_args);
+   			exit(0);
+		} //end if
+		else
+		{
+			//printf("Process Failure: ERROR %d\n", errno);
+		} //end if..else		
+	} //end if..else
 
 	return 0;
 }
@@ -225,7 +270,7 @@ int main(int argc, char *argv[])
  	home = getenv("HOME");
   	host = getenv("HOSTNAME");
 	path = getenv("PATH");
-	//cwd = getenv("PWD");
+	cwd = getenv("PWD");
 
 
 	//Other variables
@@ -254,7 +299,7 @@ int main(int argc, char *argv[])
 
 	while(1) 
 	{
-    	printf("%s quash> ", home);
+    	printf("%s quash> ", cwd);
     	if (!fgets(ln, MAX_LEN, stdin))
     	{
       		break;
@@ -295,15 +340,16 @@ int main(int argc, char *argv[])
 			cmd_vector.push_back(args[i]);
 		}
 		printf("\n");
-
+		
+		//Exit when user enters "exit" or "quit"
 		if ((strcmp(current_cmd, "exit") == 0) || (strcmp(current_cmd, "quit") == 0))
 		{
 			break;
 		}
 
 		//Execute command
-		//exec_cmd(current_cmd, args, arg_counter);
-		execute(cmd_vector);
+		exec_cmd(current_cmd, args, arg_counter);
+		//execute(cmd_vector);
 	} //end while
 
 	//free(*args);
