@@ -1,0 +1,11 @@
+apple 1
+pear 2
+carrot 3
+banana 4
+apple 5
+tree 6
+papaya 7
+almond 8
+apple 9
+apple 10
+apple 11
