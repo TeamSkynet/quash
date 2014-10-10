@@ -45,6 +45,7 @@ int exec_cmd(char *cmd, char *args[], int arg_num, int pipe)
 	path = getenv("PATH");
 	pid_t cpid;  //child process ID for background jobs
 	int back_flag = 0;
+	int stat_loc = 0;
 
 	//Check for & in command indicating background job
 	for (int i = 0; i < sizeof(cmd); i++)
@@ -127,7 +128,7 @@ int exec_cmd(char *cmd, char *args[], int arg_num, int pipe)
 		else if (cpid > 0)
 		{	
 			cout << cpid << " running in background\n";	
-			wait(NULL);				
+			waitpid(cpid, &stat_loc, 0);				
 		} //end if..else
 		else
 		{
