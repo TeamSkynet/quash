@@ -28,6 +28,13 @@
 
 using namespace std;
 
+typedef struct comm
+{
+	char cmd[10];
+	char *args[MAX_CMDS];
+	int arg_num;
+} comm;
+
 void exec_set(string envvar, string val)
 {
 	if (setenv(envvar.c_str(), val.c_str(), 1) != 0) {
@@ -35,8 +42,15 @@ void exec_set(string envvar, string val)
 	}
 }
 
-
-int exec_cmd(char *cmd, char *args[], int arg_num, int pipe)
+/*Name: exec_cmd
+  Description:  Executes a single (non-piped) command
+  Arguments:
+			cmd: The command to be executed.
+			args: The arguments to be passed to this command.
+			arg_num:  The number of arguments.
+  Returns: 0, if completes successfully.
+*/
+int exec_cmd(char *cmd, char *args[], int arg_num)
 {
 	char *path = (char *)malloc(MAX_LEN * sizeof(char));
 	char *home;
@@ -58,9 +72,21 @@ int exec_cmd(char *cmd, char *args[], int arg_num, int pipe)
 	if ((strcmp(cmd, "ls") == 0) || (strcmp(cmd, "ls&") == 0))
 	{		
 		strcpy(path, LS_EXEC);
+	}
+	else if (strcmp(cmd, "sort") == 0)
+	{
+		strcpy(path, SORT_EXEC);
+	}
+	else if (strcmp(cmd, "head") == 0)
+	{
+		strcpy(path, HEAD_EXEC);
+	}
+	else if (strcmp(cmd, "grep") == 0)
+	{
+		strcpy(path, GREP_EXEC);
 	}	
 	else if ((strcmp(cmd, "cd") == 0) || (strcmp(cmd, "cd&") == 0))
-	{
+	{  //Not quite working yet...doesn't return to main after running cd
 		if (args[0] != NULL)
 		{		
 			strcpy(path, args[0]);
@@ -138,6 +164,41 @@ int exec_cmd(char *cmd, char *args[], int arg_num, int pipe)
 	return 0;
 }
 
+/*Name: exec_piped_cmd
+  Description:  Executes a piped command sequence
+  Arguments:
+			cmds: The command to be executed, in the form of a comm (struct) array.
+				  The array contains both the commands and arguments in the individual
+				  comm objects.  Limit two commands.
+  Returns: 0, if completes successfully.
+*/
+int exec_piped_cmd(struct comm cmd1, struct comm cmd2)
+{
+		//TESTING
+		/*
+		printf("In exec_piped_cmd\n");
+		printf("%s ", cmd1.cmd);
+
+		for (int i = 0; i < cmd1.arg_num; i++)
+		{
+			printf("%s ", cmd1.args[i]);
+		}
+		printf("\n");
+
+		printf("%s ", cmd2.cmd);
+
+		for (int i = 0; i < cmd2.arg_num; i++)
+		{
+			printf("%s ", cmd2.args[i]);
+		}
+		printf("\n");
+		*/
+
+		
+
+	return 0;
+}
+
 
 //*******Main Program*******
 
@@ -163,21 +224,18 @@ int main(int argc, char **argv, char **envp)
 	int pipe_counter;
 	int command_count;
 
-	struct job
+	typedef struct job
 	{
 		int jobid;
 		pid_t pid;
 		char *command;
-	};
+	} job;
 
-	struct comm
-	{
-		char cmd[10];
-		char *args[MAX_CMDS];
-		int arg_num;
-	};
 
 	job jobs[MAX_JOBS];  //Job stack
+
+
+
 	comm* comms = new comm[2];  //command stack
 	for (int i = 0; i < 2; i++)
 	{
@@ -199,7 +257,7 @@ int main(int argc, char **argv, char **envp)
       		break;
     	}
 		
-		arg_counter = 0;
+		
 		pipe_counter = 0;
 		command_count = 1;
 		int ln_pos = 0;
@@ -236,22 +294,46 @@ int main(int argc, char **argv, char **envp)
 		//Parse first command string
 		cmd = strtok(ln1, DELIMS);
 		strcpy(comms[0].cmd, cmd);
-
+		comms[0].arg_num = 0;
 		while (cmd != NULL)
 		{	
 			cmd = (strtok(NULL, DELIMS));
 
 			if (cmd != NULL)
 			{
-				comms[0].args[arg_counter] = cmd;
-				comms[0].arg_num++;			
+				comms[0].arg_num++;
+				printf("arg_num = %d\n", comms[0].arg_num);
+				comms[0].args[comms[0].arg_num - 1] = cmd;
 			}
 						
 		} //end while
 
 		//Terminate args with NULL char
-		comms[0].args[comms[0].arg_num + 1] = NULL;
+		comms[0].args[comms[0].arg_num] = NULL;
 		
+		
+		//Parse second command string
+		if (command_count > 1)
+		{
+			cmd = strtok(ln2, DELIMS);
+			strcpy(comms[1].cmd, cmd);
+			comms[1].arg_num = 0;
+			while (cmd != NULL)
+			{	
+				cmd = (strtok(NULL, DELIMS));
+
+				if (cmd != NULL)
+				{
+					comms[1].arg_num++;	
+					comms[1].args[comms[1].arg_num - 1] = cmd;		
+				}
+						
+			} //end while
+
+			//Terminate args with NULL char
+			comms[1].args[comms[1].arg_num] = NULL;
+			} //end if
+
 		//vector<string> cmd_vector;
 		
 		//TESTING
@@ -264,16 +346,36 @@ int main(int argc, char **argv, char **envp)
 		}
 		printf("\n");
 
+		if (command_count > 1)
+		{
+			printf("%s ", comms[1].cmd);
+			//cmd_vector.push_back(current_cmd);
+			for (int i = 0; i < comms[1].arg_num; i++)
+			{
+				printf("%s ", comms[1].args[i]);
+				//cmd_vector.push_back(args[i]);
+			}
+			printf("\n");
+		} //end if
+
 		
 		
 		//Exit when user enters "exit" or "quit"
 		if ((strcmp(comms[0].cmd, "exit") == 0) || (strcmp(comms[0].cmd, "quit") == 0))
 		{
 			break;
-		}
+		}  //end if
 
 		//Execute command
-		exec_cmd(comms[0].cmd, comms[0].args, comms[0].arg_num, pipe_counter);
+		if (pipe_counter > 0)  //execute piped commands
+		{
+			exec_piped_cmd(comms[0], comms[1]);
+		}
+		else  //single command execution
+		{
+			exec_cmd(comms[0].cmd, comms[0].args, comms[0].arg_num);
+		} //end if..else
+		
 		cwd = getenv("PWD");
 		//execute(cmd_vector);
 	} //end while
