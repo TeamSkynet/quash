@@ -171,7 +171,7 @@ void execute(vector<string> command)
 	return;
 }
 
-int exec_cmd(char *cmd, char *args[], int arg_num)
+int exec_cmd(char *cmd, char *args[], int arg_num, int pipe)
 {
 	char *path = (char *)malloc(MAX_LEN * sizeof(char));
 	char *home;
@@ -194,7 +194,7 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 	{		
 		strcpy(path, LS_EXEC);
 	}	
-	else if ((strcmp(cmd, "cd") == 0) || (strcmp(cmd, "cd") == 0))
+	else if ((strcmp(cmd, "cd") == 0) || (strcmp(cmd, "cd&") == 0))
 	{
 		if (args[0] != NULL)
 		{		
@@ -204,7 +204,23 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 		{
 			strcpy(path, home);
 		}
-		chdir(path);
+
+		//Change directory to path
+		cpid = fork();
+		if (cpid == 0)
+		{
+			chdir(path);
+   			//exit(0);
+		} //end if
+		else if (cpid > 0)
+		{
+			wait(NULL);			
+		} //end if..else
+		else
+		{
+			printf("cd: Process Failure: ERROR %d\n", errno);
+		}
+		
 	} //end if..else if..else
 	
 
@@ -238,7 +254,6 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 	}  
 	else  //background execution
 	{
-
 		if (cpid == 0)
 		{
 			execv(path, exec_args);
@@ -261,7 +276,7 @@ int exec_cmd(char *cmd, char *args[], int arg_num)
 
 //*******Main Program*******
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv, char **envp)
 {
 	//Environment variables
 	char *home, *host, *path, *cwd;
@@ -277,8 +292,11 @@ int main(int argc, char *argv[])
 	char *current_cmd;  //current command for execution
 	char *args[MAX_LEN];  //argument array
 	int arg_counter;
-	char ln[MAX_LEN];
+	char *ln = new char[MAX_LEN];
+	char *ln1 = new char[MAX_LEN];
+	char *ln2 = new char[MAX_LEN];
 	int pipe_counter;
+	int command_count;
 
 	struct job
 	{
@@ -287,7 +305,19 @@ int main(int argc, char *argv[])
 		char *command;
 	};
 
-	job jobs[MAX_JOBS];
+	struct comm
+	{
+		char cmd[10];
+		char *args[MAX_CMDS];
+		int arg_num;
+	};
+
+	job jobs[MAX_JOBS];  //Job stack
+	comm* comms = new comm[2];  //command stack
+	for (int i = 0; i < 2; i++)
+	{
+		comms[i].arg_num = 0;
+	}
 
 	//Initialize arguments array
 	for (int i = 0; i < MAX_LEN; i++)
@@ -304,55 +334,90 @@ int main(int argc, char *argv[])
       		break;
     	}
 		
-		//Read in command and arguments
-		cmd = strtok(ln, DELIMS);
-		current_cmd = cmd;
 		arg_counter = 0;
 		pipe_counter = 0;
+		command_count = 1;
+		int ln_pos = 0;
+		//Read in command and arguments
+		for(int i = 0; i < strlen(ln); i++)  //Check for pipe
+		{
+			ln_pos = i;
+			if (ln[i] == '|')
+			{
+				pipe_counter = 1;
+				break;
+			}			
+		}  //end for
+		
+
+		if (pipe_counter > 0)  //pipe present
+		{
+			strncpy(ln1, ln, ln_pos - 1);
+			ln1[ln_pos - 1] = '\0';
+			strncpy(ln2, ln + ln_pos + 2, strlen(ln) - ln_pos);
+			ln2[strlen(ln) - ln_pos] = '\0';
+			command_count = 2;
+		}
+		else  //no pipe
+		{
+			strncpy(ln1, ln, strlen(ln));
+			ln1[strlen(ln)] = '\0';
+			strcpy(ln2, "\0");
+		}
+		
+		//printf("ln1 = %s\n", ln1);
+		//printf("ln2 = %s\n", ln2);
+
+		//Parse first command string
+		cmd = strtok(ln1, DELIMS);
+		strcpy(comms[0].cmd, cmd);
+
 		while (cmd != NULL)
 		{	
 			cmd = (strtok(NULL, DELIMS));
 
 			if (cmd != NULL)
 			{
-				args[arg_counter] = cmd;
-				if (strcmp(args[arg_counter], "|") == 0)
-				{
-					pipe_counter++;
-				}	
-				arg_counter++;				
+				comms[0].args[arg_counter] = cmd;
+				comms[0].arg_num++;			
 			}
 						
 		} //end while
 
 		//Terminate args with NULL char
-		args[arg_counter + 1] = NULL;
+		comms[0].args[comms[0].arg_num + 1] = NULL;
 		
-		vector<string> cmd_vector;
+		//vector<string> cmd_vector;
 		
 		//TESTING
-		printf("%s ", current_cmd);
-		cmd_vector.push_back(current_cmd);
-		for (int i = 0; i < arg_counter; i++)
+		printf("%s ", comms[0].cmd);
+		//cmd_vector.push_back(current_cmd);
+		for (int i = 0; i < comms[0].arg_num; i++)
 		{
-			printf("%s ", args[i]);
-			cmd_vector.push_back(args[i]);
+			printf("%s ", comms[0].args[i]);
+			//cmd_vector.push_back(args[i]);
 		}
 		printf("\n");
+
+		
 		
 		//Exit when user enters "exit" or "quit"
-		if ((strcmp(current_cmd, "exit") == 0) || (strcmp(current_cmd, "quit") == 0))
+		if ((strcmp(comms[0].cmd, "exit") == 0) || (strcmp(comms[0].cmd, "quit") == 0))
 		{
 			break;
 		}
 
 		//Execute command
-		exec_cmd(current_cmd, args, arg_counter);
-
+		exec_cmd(comms[0].cmd, comms[0].args, comms[0].arg_num, pipe_counter);
+		cwd = getenv("PWD");
 		//execute(cmd_vector);
 	} //end while
 
 	//free(*args);
+	delete[] ln;
+	delete[] ln1;
+	delete[] ln2;
+	delete[] comms;
 
   return 0;
 
