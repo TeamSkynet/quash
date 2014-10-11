@@ -23,14 +23,11 @@ using namespace std;
 
 Quash::Quash(char **envp)
 {
-	cur_dir = new char[MAXPATHLEN];
-	cout << "FLAG 1\n";
+	cur_dir = new char[MAXPATHLEN];	
 	this->envp = envp;
-	cout << "FLAG 2\n";
 	init_pid = getpid();
-	cout << "FLAG 3\n";
 	init_pgid = getpgrp();
-	cout << "FLAG 4\n";
+
 }
 
 
@@ -231,7 +228,7 @@ void Quash::execute(vector<string> commands)
 		//printf("leaving exec_job\n");  //FLAG
 		
 		// Delete the array we created
-		for(int j = 0 ; j < command.size() + 1 ; ++j) {
+		for(int j = 0 ; j < command.size() ; ++j) {
 			delete [] command_arr[j];
 		}
 		delete [] command_arr;
