@@ -415,7 +415,6 @@ void Quash::parse(string input)
 	while(getline(in_stream, cmd, delim)) {
 		
 		//check for redirection operator
-		cout << "cmd = " << cmd << "\n";
 		found_redir_out = cmd.find(redir_out);
 		found_redir_in = cmd.find(redir_in);
 
@@ -432,8 +431,6 @@ void Quash::parse(string input)
 			cmd = cmd.substr(0, cmd.find(redir_in));
 		}
 		fname.erase(std::remove(fname.begin(),fname.end(),' '),fname.end());  //Removes spaces
-		cout << "cmd = " << cmd << "\n";
-		cout << "fname = " << fname << "\n";
 
 		commands.push_back(cmd);
 	}
