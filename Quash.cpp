@@ -9,6 +9,8 @@
 #include <dirent.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <algorithm>
+#include <fcntl.h>
 
 #include <cstdlib>
 #include <string>
@@ -105,7 +107,7 @@ void Quash::exec_list(void)
 }
 
 
-void Quash::execute(vector<string> commands)
+void Quash::execute(vector<string> commands, bool r_in, bool r_out, string fname)
 {
 	// Show a message to the use for which bg jobs have completed
 	update_jobs();
@@ -196,10 +198,10 @@ void Quash::execute(vector<string> commands)
 		}
 		
 		// Convert vector<string> to char* array
-		char ** command_arr = new char*[command.size()];
+		char ** command_arr = new char*[command.size()+1];
 		for(int j = 0 ; j < command.size()+1 ; ++j) {
 			if(j < command.size()) {
-				command_arr[j] = new char[command[j].size() + 1];
+				command_arr[j] = new char[command[j].size() + 1]; 
 				strcpy(command_arr[j], command[j].c_str());
 			}
 			// Last item in arr needs to be a null char
@@ -209,24 +211,11 @@ void Quash::execute(vector<string> commands)
 		}
 		
 		
-		cout << "cmd_path.c_str() = "<< cmd_path.c_str() << "\n";
-		for (int k = 0; k < command.size(); k++)
-		{
-			printf("command_arr[%d] = %s\n", k, command_arr[k]);
-		}
-		
-		printf("mode = %c\n", mode);
-		
-		//printf((char *) i);
-		//printf("commands.size() = %d\n", commands.size());
-		
-		//printf("entering exec_job\n"); //FLAG
 		// Execute command
 		exec_job(cmd_path.c_str(), command_arr, commands.at(i), mode, pipesfd, 
-				(int)i, (int)commands.size());
+				(int)i, (int)commands.size(), r_in, r_out, fname);
 		
-		//printf("leaving exec_job\n");  //FLAG
-		
+	
 		// Delete the array we created
 		for(int j = 0 ; j < command.size() ; ++j) {
 			delete [] command_arr[j];
@@ -243,12 +232,15 @@ void Quash::execute(vector<string> commands)
 
 
 void Quash::exec_job(const char *cmd_path, char **command, string command_str, 
-				char mode, int pipes[], int commands_i, int commands_size)
+				char mode, int pipes[], int commands_i, int commands_size, bool r_in, bool r_out, string fname)
 {
 	int status = 0;
 	
 	pid_t pid;
 	pid = fork();
+	int fd;
+
+	//cout << "in exec_job:" << r_in << " " << r_out << "\n";
 	
 	if(pid == -1) {
 		cout << cmd_path << ": fork error" << endl;
@@ -265,8 +257,30 @@ void Quash::exec_job(const char *cmd_path, char **command, string command_str,
 			close(pipes[1]);
 			dup2(pipes[0], 0);
 			close(pipes[0]);
+
+			if (r_in)  //redirect input
+			{
+				fd = open(fname.c_str(), O_RDONLY);
+				dup2(fd, 0);		
+			}			
+			else if (r_out)	{
+				fd = open(fname.c_str(), O_WRONLY | O_CREAT,777);
+				dup2(fd, 1);
+			}
+			
 		}
-		
+		else if (commands_size == 1 && commands_i == 0 && r_in) {
+			//cout << "commands 1, r_in\n";
+			fd = open(fname.c_str(), O_RDONLY);
+			dup2(fd, 0);
+		}		
+		else if (commands_size == 1 && commands_i == 0 && r_out) {
+			//cout << "commands 1, r_out\n";
+			fd = open(fname.c_str(), O_WRONLY | O_CREAT,777);
+			dup2(fd, 1);
+		}
+		close(fd);
+					
 		if(mode == 'f') {
 			// Execute the command and exit success
 			execve(cmd_path, command, envp);
@@ -390,16 +404,41 @@ void Quash::parse(string input)
 	char delim = '|';
 	stringstream in_stream(input);
 	string cmd;
+	string fname = "none";
+	string redir_out = ">";
+	string redir_in = "<";
+	size_t found_redir_out = cmd.find(redir_out);
+	size_t found_redir_in = cmd.find(redir_in);
+	bool r_out = false;
+	bool r_in = false;
+
 	while(getline(in_stream, cmd, delim)) {
+		
+		//check for redirection operator
+		cout << "cmd = " << cmd << "\n";
+		found_redir_out = cmd.find(redir_out);
+		found_redir_in = cmd.find(redir_in);
+
+		if (found_redir_out != std::string::npos)
+		{
+			r_out = true;
+			fname = cmd.substr(cmd.find(redir_out) + 1); 
+			cmd = cmd.substr(0, cmd.find(redir_out));
+		}
+		else if (found_redir_in != std::string::npos)
+		{
+			r_in = true;
+			fname = cmd.substr(cmd.find(redir_in) + 1); 
+			cmd = cmd.substr(0, cmd.find(redir_in));
+		}
+		fname.erase(std::remove(fname.begin(),fname.end(),' '),fname.end());  //Removes spaces
+		cout << "cmd = " << cmd << "\n";
+		cout << "fname = " << fname << "\n";
+
 		commands.push_back(cmd);
 	}
 
-	for (int i = 0; i < commands.size(); i++)
-	{
-		printf("commands[%d] = %s\n", i, commands[i].c_str());
-	}
-	
-	execute(commands);
+	execute(commands, r_in, r_out, fname);
 
 }
 
